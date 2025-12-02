@@ -7,7 +7,10 @@ import {
   searchSchools,
   searchInstructors,
   submitSchoolReview,
-  submitInstructorReview
+  submitInstructorReview,
+  submitSchoolSuggestion,
+  submitInstructorSuggestion,
+  reportReview
 } from './supabase';
 
 const availableTags = [
@@ -115,31 +118,573 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// Header Component
-const Header = ({ currentView, setCurrentView, setSearchQuery }) => (
-  <header className="header">
-    <div className="header-content">
-      <div className="logo" onClick={() => { setCurrentView('home'); setSearchQuery(''); }}>
-        <span className="logo-icon">🥋</span>
-        <span className="logo-text">RateMyProfessors<span className="logo-highlight">Autism</span></span>
+// Modal Component
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '1rem'
+    }} onClick={onClose}>
+      <div style={{
+        background: '#141416',
+        borderRadius: '16px',
+        padding: '2rem',
+        maxWidth: '500px',
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{title}</h2>
+          <button onClick={onClose} style={{
+            background: 'none',
+            border: 'none',
+            color: '#888',
+            fontSize: '1.5rem',
+            cursor: 'pointer'
+          }}>×</button>
+        </div>
+        {children}
       </div>
-      <nav className="nav">
-        <button 
-          className={`nav-btn ${currentView === 'schools' ? 'active' : ''}`}
-          onClick={() => setCurrentView('schools')}
-        >
-          Schools
-        </button>
-        <button 
-          className={`nav-btn ${currentView === 'instructors' ? 'active' : ''}`}
-          onClick={() => setCurrentView('instructors')}
-        >
-          Instructors
-        </button>
-      </nav>
     </div>
-  </header>
+  );
+};
+
+// Submit School Modal
+const SubmitSchoolModal = ({ isOpen, onClose }) => {
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [website, setWebsite] = useState('');
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name || !location) {
+      alert('Please fill in school name and location');
+      return;
+    }
+    setSubmitting(true);
+    const result = await submitSchoolSuggestion(name, location, website, email);
+    setSubmitting(false);
+    if (result.success) {
+      setSubmitted(true);
+      setTimeout(() => {
+        onClose();
+        setSubmitted(false);
+        setName('');
+        setLocation('');
+        setWebsite('');
+        setEmail('');
+      }, 2000);
+    } else {
+      alert('Error submitting. Please try again.');
+    }
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.75rem',
+    background: '#1a1a1e',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '1rem',
+    marginBottom: '1rem'
+  };
+
+  if (submitted) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="School Submitted!">
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <span style={{ fontSize: '4rem' }}>✅</span>
+          <p style={{ marginTop: '1rem', color: '#888' }}>Thanks! We'll review and add it soon.</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Submit a School">
+      <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+        Don't see your school? Submit it and we'll add it to the database.
+      </p>
+      <input
+        type="text"
+        placeholder="School Name *"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        style={inputStyle}
+      />
+      <input
+        type="text"
+        placeholder="City, State (e.g., Los Angeles, CA) *"
+        value={location}
+        onChange={e => setLocation(e.target.value)}
+        style={inputStyle}
+      />
+      <input
+        type="text"
+        placeholder="Website (optional)"
+        value={website}
+        onChange={e => setWebsite(e.target.value)}
+        style={inputStyle}
+      />
+      <input
+        type="email"
+        placeholder="Your Email (optional, for updates)"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        style={inputStyle}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={submitting}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: 'linear-gradient(135deg, #ff3d3d, #ff6b35)',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#fff',
+          fontSize: '1rem',
+          fontWeight: 600,
+          cursor: 'pointer'
+        }}
+      >
+        {submitting ? 'Submitting...' : 'Submit School'}
+      </button>
+    </Modal>
+  );
+};
+
+// Submit Instructor Modal
+const SubmitInstructorModal = ({ isOpen, onClose }) => {
+  const [name, setName] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [belt, setBelt] = useState('Black Belt');
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name || !schoolName) {
+      alert('Please fill in instructor name and school');
+      return;
+    }
+    setSubmitting(true);
+    const result = await submitInstructorSuggestion(name, schoolName, belt, email);
+    setSubmitting(false);
+    if (result.success) {
+      setSubmitted(true);
+      setTimeout(() => {
+        onClose();
+        setSubmitted(false);
+        setName('');
+        setSchoolName('');
+        setBelt('Black Belt');
+        setEmail('');
+      }, 2000);
+    } else {
+      alert('Error submitting. Please try again.');
+    }
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.75rem',
+    background: '#1a1a1e',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '1rem',
+    marginBottom: '1rem'
+  };
+
+  if (submitted) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Instructor Submitted!">
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <span style={{ fontSize: '4rem' }}>✅</span>
+          <p style={{ marginTop: '1rem', color: '#888' }}>Thanks! We'll review and add them soon.</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Submit an Instructor">
+      <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+        Don't see your instructor? Submit them and we'll add them to the database.
+      </p>
+      <input
+        type="text"
+        placeholder="Instructor Name *"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        style={inputStyle}
+      />
+      <input
+        type="text"
+        placeholder="School Name *"
+        value={schoolName}
+        onChange={e => setSchoolName(e.target.value)}
+        style={inputStyle}
+      />
+      <select
+        value={belt}
+        onChange={e => setBelt(e.target.value)}
+        style={{ ...inputStyle, cursor: 'pointer' }}
+      >
+        <option value="White Belt">White Belt</option>
+        <option value="Blue Belt">Blue Belt</option>
+        <option value="Purple Belt">Purple Belt</option>
+        <option value="Brown Belt">Brown Belt</option>
+        <option value="Black Belt">Black Belt</option>
+        <option value="Red/Black Belt">Red/Black Belt</option>
+        <option value="Red Belt">Red Belt</option>
+      </select>
+      <input
+        type="email"
+        placeholder="Your Email (optional, for updates)"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        style={inputStyle}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={submitting}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: 'linear-gradient(135deg, #ff3d3d, #ff6b35)',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#fff',
+          fontSize: '1rem',
+          fontWeight: 600,
+          cursor: 'pointer'
+        }}
+      >
+        {submitting ? 'Submitting...' : 'Submit Instructor'}
+      </button>
+    </Modal>
+  );
+};
+
+// Report Modal
+const ReportModal = ({ isOpen, onClose, reviewType, reviewId }) => {
+  const [reason, setReason] = useState('');
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!reason) {
+      alert('Please provide a reason for the report');
+      return;
+    }
+    setSubmitting(true);
+    const result = await reportReview(reviewType, reviewId, reason, email);
+    setSubmitting(false);
+    if (result.success) {
+      setSubmitted(true);
+      setTimeout(() => {
+        onClose();
+        setSubmitted(false);
+        setReason('');
+        setEmail('');
+      }, 2000);
+    } else {
+      alert('Error submitting report. Please try again.');
+    }
+  };
+
+  if (submitted) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Report Submitted">
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <span style={{ fontSize: '4rem' }}>✅</span>
+          <p style={{ marginTop: '1rem', color: '#888' }}>Thanks for helping keep our community safe.</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Report Review">
+      <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+        Report this review if it violates our guidelines (fake, offensive, or inappropriate content).
+      </p>
+      <select
+        value={reason}
+        onChange={e => setReason(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: '#1a1a1e',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px',
+          color: '#fff',
+          fontSize: '1rem',
+          marginBottom: '1rem',
+          cursor: 'pointer'
+        }}
+      >
+        <option value="">Select a reason...</option>
+        <option value="fake">Fake or false review</option>
+        <option value="offensive">Offensive or inappropriate language</option>
+        <option value="spam">Spam or advertising</option>
+        <option value="personal">Contains personal information</option>
+        <option value="other">Other</option>
+      </select>
+      <input
+        type="email"
+        placeholder="Your Email (optional)"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: '#1a1a1e',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px',
+          color: '#fff',
+          fontSize: '1rem',
+          marginBottom: '1rem'
+        }}
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={submitting || !reason}
+        style={{
+          width: '100%',
+          padding: '0.75rem',
+          background: reason ? 'linear-gradient(135deg, #ff3d3d, #ff6b35)' : '#333',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#fff',
+          fontSize: '1rem',
+          fontWeight: 600,
+          cursor: reason ? 'pointer' : 'not-allowed'
+        }}
+      >
+        {submitting ? 'Submitting...' : 'Submit Report'}
+      </button>
+    </Modal>
+  );
+};
+
+// Terms of Service Page
+const TermsPage = ({ onBack }) => (
+  <div className="detail-view" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <button className="back-btn" onClick={onBack}>← Back</button>
+    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '2rem' }}>Terms of Service</h1>
+    
+    <div style={{ color: '#ccc', lineHeight: 1.8 }}>
+      <p style={{ marginBottom: '1rem' }}><strong>Last Updated:</strong> December 2025</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>1. Acceptance of Terms</h2>
+      <p>By using RateMyProfessorsAutism.com ("the Site"), you agree to these Terms of Service.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>2. User-Generated Content</h2>
+      <p>• All reviews, ratings, and comments are submitted by users, not by RateMyProfessorsAutism.com</p>
+      <p>• We do not verify, endorse, or guarantee the accuracy of any user-submitted content</p>
+      <p>• Reviews represent the personal opinions of individual users only</p>
+      <p>• We are not responsible for any user-submitted content</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>3. User Conduct</h2>
+      <p>By submitting content, you agree that you will NOT post:</p>
+      <p>• False statements presented as facts</p>
+      <p>• Defamatory, libelous, or slanderous content</p>
+      <p>• Content that violates any applicable law</p>
+      <p>• Personal attacks or harassment</p>
+      <p>• Confidential or private information about others</p>
+      <p>• Spam, advertising, or promotional content</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>4. Review Guidelines</h2>
+      <p>• Reviews must be based on genuine, first-hand experience</p>
+      <p>• Reviews should be honest and fair</p>
+      <p>• Focus on your experience at the school/with the instructor</p>
+      <p>• Do not post reviews for schools/instructors you have not trained with</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>5. Content Removal</h2>
+      <p>We reserve the right to remove any content that violates these Terms of Service or that we determine to be inappropriate.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>6. Disclaimer of Warranties</h2>
+      <p>THE SITE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND. WE DO NOT GUARANTEE THE ACCURACY, COMPLETENESS, OR USEFULNESS OF ANY CONTENT.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>7. Limitation of Liability</h2>
+      <p>RATEMYPROFESSORSAUTISM.COM SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM USER-SUBMITTED CONTENT, YOUR RELIANCE ON ANY CONTENT, OR YOUR INTERACTIONS WITH ANY SCHOOL OR INSTRUCTOR LISTED.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>8. Contact</h2>
+      <p>Questions? Use the report feature on any review or reach out through our submission forms.</p>
+    </div>
+  </div>
 );
+
+// Privacy Policy Page
+const PrivacyPage = ({ onBack }) => (
+  <div className="detail-view" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <button className="back-btn" onClick={onBack}>← Back</button>
+    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '2rem' }}>Privacy Policy</h1>
+    
+    <div style={{ color: '#ccc', lineHeight: 1.8 }}>
+      <p style={{ marginBottom: '1rem' }}><strong>Last Updated:</strong> December 2025</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>Information We Collect</h2>
+      <p>• Reviews and ratings you submit</p>
+      <p>• Email address (only if you choose to provide it)</p>
+      <p>• Basic usage data (pages visited)</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>How We Use Information</h2>
+      <p>• To display your reviews on the site</p>
+      <p>• To contact you about submissions if you provide email</p>
+      <p>• To improve the site</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>Information Sharing</h2>
+      <p>• We do not sell your personal information</p>
+      <p>• Reviews are public and visible to all users</p>
+      <p>• We may share information if required by law</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>Your Rights</h2>
+      <p>You may request deletion of your data by reporting your own review with a deletion request.</p>
+    </div>
+  </div>
+);
+
+// About/FAQ Page
+const AboutPage = ({ onBack }) => (
+  <div className="detail-view" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <button className="back-btn" onClick={onBack}>← Back</button>
+    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '2rem' }}>About & FAQ</h1>
+    
+    <div style={{ color: '#ccc', lineHeight: 1.8 }}>
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>What is this site?</h2>
+      <p>RateMyProfessorsAutism is a community-driven platform for rating and reviewing martial arts schools and instructors, primarily focused on Brazilian Jiu-Jitsu.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>What does "Autism Level" mean?</h2>
+      <p>It's a playful way to measure an instructor's obsessive dedication to the craft. A high "autism level" means they're deeply passionate, detail-oriented, and fully committed to jiu-jitsu. It's a compliment in the BJJ community!</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>School Rating Categories</h2>
+      <div style={{ background: '#1a1a1e', padding: '1.5rem', borderRadius: '12px', marginTop: '1rem' }}>
+        {schoolCriteria.map(c => (
+          <p key={c.key} style={{ marginBottom: '0.5rem' }}>
+            <span style={{ marginRight: '0.5rem' }}>{c.icon}</span>
+            <strong>{c.label}</strong>
+          </p>
+        ))}
+      </div>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>How do I add a school or instructor?</h2>
+      <p>Click the "+ Add" button in the navigation to submit a school or instructor. We'll review and add it to the database.</p>
+      
+      <h2 style={{ fontSize: '1.3rem', marginTop: '2rem', marginBottom: '1rem', color: '#fff' }}>Are reviews verified?</h2>
+      <p>No. Reviews are user-submitted opinions and are not verified. Please use your own judgment when reading reviews.</p>
+    </div>
+  </div>
+);
+
+// Header Component
+const Header = ({ currentView, setCurrentView, setSearchQuery, setShowSubmitSchool, setShowSubmitInstructor }) => {
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  
+  return (
+    <header className="header">
+      <div className="header-content">
+        <div className="logo" onClick={() => { setCurrentView('home'); setSearchQuery(''); }}>
+          <span className="logo-icon">🥋</span>
+          <span className="logo-text">RateMyProfessors<span className="logo-highlight">Autism</span></span>
+        </div>
+        <nav className="nav">
+          <button 
+            className={`nav-btn ${currentView === 'schools' ? 'active' : ''}`}
+            onClick={() => setCurrentView('schools')}
+          >
+            Schools
+          </button>
+          <button 
+            className={`nav-btn ${currentView === 'instructors' ? 'active' : ''}`}
+            onClick={() => setCurrentView('instructors')}
+          >
+            Instructors
+          </button>
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="nav-btn cta"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              + Add
+            </button>
+            {showAddMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                background: '#1a1a1e',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                padding: '0.5rem',
+                marginTop: '0.5rem',
+                minWidth: '150px',
+                zIndex: 100
+              }}>
+                <button
+                  onClick={() => { setShowSubmitSchool(true); setShowAddMenu(false); }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'none',
+                    border: 'none',
+                    color: '#fff',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  onMouseOver={e => e.target.style.background = '#252528'}
+                  onMouseOut={e => e.target.style.background = 'none'}
+                >
+                  🏫 Add School
+                </button>
+                <button
+                  onClick={() => { setShowSubmitInstructor(true); setShowAddMenu(false); }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'none',
+                    border: 'none',
+                    color: '#fff',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                  onMouseOver={e => e.target.style.background = '#252528'}
+                  onMouseOut={e => e.target.style.background = 'none'}
+                >
+                  👤 Add Instructor
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+      </div>
+    </header>
+  );
+};
 
 // Search Component
 const SearchBar = ({ searchQuery, setSearchQuery, searchType, setSearchType, onSearch }) => {
@@ -275,6 +820,7 @@ const SchoolDetail = ({ schoolId, onBack }) => {
   );
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [reportingReview, setReportingReview] = useState(null);
 
   useEffect(() => {
     loadSchool();
@@ -297,7 +843,7 @@ const SchoolDetail = ({ schoolId, onBack }) => {
       setShowRatingForm(false);
       setRatings(schoolCriteria.reduce((acc, c) => ({ ...acc, [c.key]: 0 }), {}));
       setComment('');
-      loadSchool(); // Reload to show new review
+      loadSchool();
     } else {
       alert('Error submitting review. Please try again.');
     }
@@ -343,6 +889,9 @@ const SchoolDetail = ({ schoolId, onBack }) => {
       {showRatingForm && (
         <div className="rating-form">
           <h2>Rate {school.name}</h2>
+          <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            ⚠️ By submitting, you confirm this review is based on your genuine experience and complies with our Terms of Service.
+          </p>
           <div className="criteria-grid">
             {schoolCriteria.map((criterion) => (
               <div key={criterion.key} className="criterion-item">
@@ -411,6 +960,18 @@ const SchoolDetail = ({ schoolId, onBack }) => {
                   <span className="review-date">
                     {new Date(review.created_at).toLocaleDateString()}
                   </span>
+                  <button
+                    onClick={() => setReportingReview(review.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#666',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    🚩 Report
+                  </button>
                 </div>
                 {review.comment && <p className="review-comment">{review.comment}</p>}
               </div>
@@ -418,6 +979,13 @@ const SchoolDetail = ({ schoolId, onBack }) => {
           </div>
         </div>
       )}
+      
+      <ReportModal
+        isOpen={reportingReview !== null}
+        onClose={() => setReportingReview(null)}
+        reviewType="school"
+        reviewId={reportingReview}
+      />
     </div>
   );
 };
@@ -432,6 +1000,7 @@ const InstructorDetail = ({ instructorId, onBack }) => {
   const [selectedTags, setSelectedTags] = useState([]);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [reportingReview, setReportingReview] = useState(null);
 
   useEffect(() => {
     loadInstructor();
@@ -536,6 +1105,9 @@ const InstructorDetail = ({ instructorId, onBack }) => {
       {showRatingForm && (
         <div className="rating-form">
           <h2>Rate {instructor.name}</h2>
+          <p style={{ color: '#888', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            ⚠️ By submitting, you confirm this review is based on your genuine experience and complies with our Terms of Service.
+          </p>
           
           <div className="instructor-ratings">
             <div className="rating-section">
@@ -604,9 +1176,23 @@ const InstructorDetail = ({ instructorId, onBack }) => {
                       <AutismMeter level={review.autism_level} size="sm" />
                     </div>
                   </div>
-                  <span className="review-date">
-                    {new Date(review.created_at).toLocaleDateString()}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span className="review-date">
+                      {new Date(review.created_at).toLocaleDateString()}
+                    </span>
+                    <button
+                      onClick={() => setReportingReview(review.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#666',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      🚩 Report
+                    </button>
+                  </div>
                 </div>
                 {review.comment && <p className="review-comment">{review.comment}</p>}
                 {review.tags && review.tags.length > 0 && (
@@ -621,6 +1207,13 @@ const InstructorDetail = ({ instructorId, onBack }) => {
           </div>
         </div>
       )}
+      
+      <ReportModal
+        isOpen={reportingReview !== null}
+        onClose={() => setReportingReview(null)}
+        reviewType="instructor"
+        reviewId={reportingReview}
+      />
     </div>
   );
 };
@@ -886,6 +1479,43 @@ const InstructorsView = ({ setSelectedInstructor, setCurrentView }) => {
   );
 };
 
+// Footer Component
+const Footer = ({ setCurrentView }) => (
+  <footer className="footer">
+    <div style={{ marginBottom: '1rem' }}>
+      <span style={{ fontSize: '1.5rem', marginRight: '0.5rem' }}>🥋</span>
+      <span style={{ fontWeight: 600 }}>RateMyProfessorsAutism.com</span>
+    </div>
+    <p style={{ color: '#888', marginBottom: '1rem' }}>
+      Find your perfect training ground
+    </p>
+    <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+      <button 
+        onClick={() => setCurrentView('about')}
+        style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem' }}
+      >
+        About / FAQ
+      </button>
+      <button 
+        onClick={() => setCurrentView('terms')}
+        style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem' }}
+      >
+        Terms of Service
+      </button>
+      <button 
+        onClick={() => setCurrentView('privacy')}
+        style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '0.9rem' }}
+      >
+        Privacy Policy
+      </button>
+    </div>
+    <p style={{ fontSize: '0.8rem', color: '#606068', maxWidth: '600px', margin: '0 auto' }}>
+      ⚠️ Reviews are user-submitted opinions and do not represent the views of RateMyProfessorsAutism.com. 
+      We do not verify or endorse any content. Use your own judgment.
+    </p>
+  </footer>
+);
+
 // Main App Component
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
@@ -893,6 +1523,8 @@ export default function App() {
   const [searchType, setSearchType] = useState('all');
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
+  const [showSubmitSchool, setShowSubmitSchool] = useState(false);
+  const [showSubmitInstructor, setShowSubmitInstructor] = useState(false);
   
   return (
     <div className="app">
@@ -900,6 +1532,8 @@ export default function App() {
         currentView={currentView} 
         setCurrentView={setCurrentView}
         setSearchQuery={setSearchQuery}
+        setShowSubmitSchool={setShowSubmitSchool}
+        setShowSubmitInstructor={setShowSubmitInstructor}
       />
       
       <main className="main-content">
@@ -942,14 +1576,31 @@ export default function App() {
             onBack={() => setCurrentView('instructors')}
           />
         )}
+        
+        {currentView === 'terms' && (
+          <TermsPage onBack={() => setCurrentView('home')} />
+        )}
+        
+        {currentView === 'privacy' && (
+          <PrivacyPage onBack={() => setCurrentView('home')} />
+        )}
+        
+        {currentView === 'about' && (
+          <AboutPage onBack={() => setCurrentView('home')} />
+        )}
       </main>
       
-      <footer className="footer">
-        <p>🥋 RateMyProfessorsAutism.com — Find your training home</p>
-        <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: '#606068' }}>
-          Reviews are user-submitted opinions. We do not verify or endorse any content.
-        </p>
-      </footer>
+      <Footer setCurrentView={setCurrentView} />
+      
+      <SubmitSchoolModal 
+        isOpen={showSubmitSchool} 
+        onClose={() => setShowSubmitSchool(false)} 
+      />
+      
+      <SubmitInstructorModal 
+        isOpen={showSubmitInstructor} 
+        onClose={() => setShowSubmitInstructor(false)} 
+      />
     </div>
   );
 }

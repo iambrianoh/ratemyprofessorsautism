@@ -245,3 +245,65 @@ export async function searchInstructors(query) {
     schoolName: instructor.schools?.name || 'Unknown School'
   }))
 }
+
+// ============================================
+// USER SUBMISSIONS (for adding new schools/instructors)
+// ============================================
+
+export async function submitSchoolSuggestion(name, location, website, email) {
+  const { data, error } = await supabase
+    .from('school_submissions')
+    .insert({
+      name,
+      location,
+      website,
+      submitted_by_email: email
+    })
+    .select()
+  
+  if (error) {
+    console.error('Error submitting school suggestion:', error)
+    return { success: false, error }
+  }
+  return { success: true, data }
+}
+
+export async function submitInstructorSuggestion(name, schoolName, belt, email) {
+  const { data, error } = await supabase
+    .from('instructor_submissions')
+    .insert({
+      name,
+      school_name: schoolName,
+      belt,
+      submitted_by_email: email
+    })
+    .select()
+  
+  if (error) {
+    console.error('Error submitting instructor suggestion:', error)
+    return { success: false, error }
+  }
+  return { success: true, data }
+}
+
+// ============================================
+// REPORT REVIEWS
+// ============================================
+
+export async function reportReview(reviewType, reviewId, reason, email) {
+  const { data, error } = await supabase
+    .from('review_reports')
+    .insert({
+      review_type: reviewType,
+      review_id: reviewId,
+      reason,
+      reported_by_email: email
+    })
+    .select()
+  
+  if (error) {
+    console.error('Error reporting review:', error)
+    return { success: false, error }
+  }
+  return { success: true, data }
+}
