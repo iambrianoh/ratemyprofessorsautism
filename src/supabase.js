@@ -1,19 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
-// ⚠️ REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
-const supabaseUrl = 'https://YOUR-PROJECT-ID.supabase.co'
-const supabaseKey = 'YOUR-ANON-KEY-HERE'
+const supabaseUrl = 'https://hppxhhnxbkufcuhikvel.supabase.co'
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhwcHhoaG54Ymt1ZmN1aGlrdmVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MDM2MTgsImV4cCI6MjA4MDE3OTYxOH0.5iCVr6dy92ZfoBo7_Bz1BgqJovt1LbVl4V9NHpSZf_w'
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Helper functions to interact with the database
-
+// ============================================
 // SCHOOLS
+// ============================================
+
 export async function getSchools() {
   const { data, error } = await supabase
     .from('schools')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('name')
   
   if (error) {
     console.error('Error fetching schools:', error)
@@ -22,8 +22,7 @@ export async function getSchools() {
   return data
 }
 
-export async function getSchoolWithReviews(schoolId) {
-  // Get school
+export async function getSchoolById(schoolId) {
   const { data: school, error: schoolError } = await supabase
     .from('schools')
     .select('*')
@@ -42,19 +41,19 @@ export async function getSchoolWithReviews(schoolId) {
     .eq('school_id', schoolId)
     .order('created_at', { ascending: false })
 
-  if (reviewsError) {
-    console.error('Error fetching reviews:', reviewsError)
-    return { ...school, reviews: [], avgRatings: null }
-  }
-
   // Calculate average ratings
-  const avgRatings = calculateSchoolAverages(reviews)
+  const avgRatings = calculateSchoolAverages(reviews || [])
 
-  return { ...school, reviews, avgRatings, reviewCount: reviews.length }
+  return { 
+    ...school, 
+    reviews: reviews || [], 
+    avgRatings, 
+    reviewCount: reviews?.length || 0 
+  }
 }
 
 function calculateSchoolAverages(reviews) {
-  if (reviews.length === 0) return null
+  if (!reviews || reviews.length === 0) return null
   
   const criteria = [
     'training_partner_quality', 'curriculum_quality', 'coaching_quality',
@@ -63,47 +62,43 @@ function calculateSchoolAverages(reviews) {
     'conflict_handling', 'inclusivity'
   ]
   
-  const totals = {}
-  criteria.forEach(c => totals[c] = 0)
-  
-  reviews.forEach(review => {
-    criteria.forEach(c => {
-      if (review[c]) totals[c] += review[c]
-    })
-  })
-  
   const averages = {}
+  let overallSum = 0
+  let criteriaCount = 0
+  
   criteria.forEach(c => {
-    averages[c] = totals[c] / reviews.length
+    const values = reviews.map(r => r[c]).filter(v => v != null)
+    if (values.length > 0) {
+      averages[c] = values.reduce((a, b) => a + b, 0) / values.length
+      overallSum += averages[c]
+      criteriaCount++
+    }
   })
   
-  // Overall average
-  const overallSum = Object.values(averages).reduce((a, b) => a + b, 0)
-  averages.overall = overallSum / criteria.length
+  averages.overall = criteriaCount > 0 ? overallSum / criteriaCount : 0
   
   return averages
 }
 
-export async function submitSchoolReview(schoolId, ratings, comment, userEmail = null) {
+export async function submitSchoolReview(schoolId, ratings, comment) {
   const { data, error } = await supabase
     .from('school_reviews')
     .insert({
       school_id: schoolId,
-      user_email: userEmail,
-      training_partner_quality: ratings.trainingPartnerQuality,
-      curriculum_quality: ratings.curriculumQuality,
-      coaching_quality: ratings.coachingQuality,
-      class_variety: ratings.classVariety,
-      schedule: ratings.schedule,
-      cleanliness: ratings.cleanliness,
-      cost: ratings.cost,
-      competition_support: ratings.competitionSupport,
-      injury_management: ratings.injuryManagement,
-      vibe_fit: ratings.vibeFit,
-      coach_availability: ratings.coachAvailability,
-      student_retention: ratings.studentRetention,
-      conflict_handling: ratings.conflictHandling,
-      inclusivity: ratings.inclusivity,
+      training_partner_quality: ratings.trainingPartnerQuality || null,
+      curriculum_quality: ratings.curriculumQuality || null,
+      coaching_quality: ratings.coachingQuality || null,
+      class_variety: ratings.classVariety || null,
+      schedule: ratings.schedule || null,
+      cleanliness: ratings.cleanliness || null,
+      cost: ratings.cost || null,
+      competition_support: ratings.competitionSupport || null,
+      injury_management: ratings.injuryManagement || null,
+      vibe_fit: ratings.vibeFit || null,
+      coach_availability: ratings.coachAvailability || null,
+      student_retention: ratings.studentRetention || null,
+      conflict_handling: ratings.conflictHandling || null,
+      inclusivity: ratings.inclusivity || null,
       comment: comment
     })
     .select()
@@ -115,35 +110,37 @@ export async function submitSchoolReview(schoolId, ratings, comment, userEmail =
   return { success: true, data }
 }
 
+// ============================================
 // INSTRUCTORS
+// ============================================
+
 export async function getInstructors() {
   const { data, error } = await supabase
     .from('instructors')
     .select(`
       *,
-      schools (name)
+      schools (name, location)
     `)
-    .order('created_at', { ascending: false })
+    .order('name')
   
   if (error) {
     console.error('Error fetching instructors:', error)
     return []
   }
   
-  // Format the data to include school name directly
   return data.map(instructor => ({
     ...instructor,
-    schoolName: instructor.schools?.name || 'Unknown School'
+    schoolName: instructor.schools?.name || 'Unknown School',
+    schoolLocation: instructor.schools?.location || ''
   }))
 }
 
-export async function getInstructorWithReviews(instructorId) {
-  // Get instructor with school info
+export async function getInstructorById(instructorId) {
   const { data: instructor, error: instructorError } = await supabase
     .from('instructors')
     .select(`
       *,
-      schools (name)
+      schools (name, location)
     `)
     .eq('id', instructorId)
     .single()
@@ -160,16 +157,16 @@ export async function getInstructorWithReviews(instructorId) {
     .eq('instructor_id', instructorId)
     .order('created_at', { ascending: false })
 
-  if (reviewsError) {
-    console.error('Error fetching reviews:', reviewsError)
-    return { ...instructor, schoolName: instructor.schools?.name, reviews: [], avgRatings: null }
-  }
-
   // Calculate averages
-  const avgRatings = calculateInstructorAverages(reviews)
-  
+  const avgQuality = reviews && reviews.length > 0 
+    ? reviews.reduce((sum, r) => sum + r.quality_rating, 0) / reviews.length 
+    : 0
+  const avgAutism = reviews && reviews.length > 0 
+    ? reviews.reduce((sum, r) => sum + r.autism_level, 0) / reviews.length 
+    : 0
+
   // Get all tags from reviews
-  const allTags = reviews.flatMap(r => r.tags || [])
+  const allTags = (reviews || []).flatMap(r => r.tags || [])
   const tagCounts = {}
   allTags.forEach(tag => {
     tagCounts[tag] = (tagCounts[tag] || 0) + 1
@@ -181,32 +178,21 @@ export async function getInstructorWithReviews(instructorId) {
 
   return { 
     ...instructor, 
-    schoolName: instructor.schools?.name,
-    reviews, 
-    avgRatings,
-    reviewCount: reviews.length,
-    topTags
+    schoolName: instructor.schools?.name || 'Unknown School',
+    schoolLocation: instructor.schools?.location || '',
+    reviews: reviews || [], 
+    qualityRating: avgQuality,
+    autismLevel: avgAutism,
+    reviewCount: reviews?.length || 0,
+    tags: topTags
   }
 }
 
-function calculateInstructorAverages(reviews) {
-  if (reviews.length === 0) return { quality: 0, autism: 0 }
-  
-  const totalQuality = reviews.reduce((sum, r) => sum + (r.quality_rating || 0), 0)
-  const totalAutism = reviews.reduce((sum, r) => sum + (r.autism_level || 0), 0)
-  
-  return {
-    quality: totalQuality / reviews.length,
-    autism: totalAutism / reviews.length
-  }
-}
-
-export async function submitInstructorReview(instructorId, quality, autism, tags, comment, userEmail = null) {
+export async function submitInstructorReview(instructorId, quality, autism, tags, comment) {
   const { data, error } = await supabase
     .from('instructor_reviews')
     .insert({
       instructor_id: instructorId,
-      user_email: userEmail,
       quality_rating: quality,
       autism_level: autism,
       tags: tags,
@@ -221,12 +207,16 @@ export async function submitInstructorReview(instructorId, quality, autism, tags
   return { success: true, data }
 }
 
+// ============================================
 // SEARCH
+// ============================================
+
 export async function searchSchools(query) {
   const { data, error } = await supabase
     .from('schools')
     .select('*')
     .or(`name.ilike.%${query}%,location.ilike.%${query}%`)
+    .order('name')
   
   if (error) {
     console.error('Error searching schools:', error)
@@ -240,9 +230,10 @@ export async function searchInstructors(query) {
     .from('instructors')
     .select(`
       *,
-      schools (name)
+      schools (name, location)
     `)
-    .or(`name.ilike.%${query}%`)
+    .ilike('name', `%${query}%`)
+    .order('name')
   
   if (error) {
     console.error('Error searching instructors:', error)
@@ -253,31 +244,4 @@ export async function searchInstructors(query) {
     ...instructor,
     schoolName: instructor.schools?.name || 'Unknown School'
   }))
-}
-
-// ADMIN FUNCTIONS (for adding schools/instructors)
-export async function addSchool(name, location, imageUrl = null) {
-  const { data, error } = await supabase
-    .from('schools')
-    .insert({ name, location, image_url: imageUrl })
-    .select()
-  
-  if (error) {
-    console.error('Error adding school:', error)
-    return { success: false, error }
-  }
-  return { success: true, data: data[0] }
-}
-
-export async function addInstructor(name, schoolId, belt, imageUrl = null) {
-  const { data, error } = await supabase
-    .from('instructors')
-    .insert({ name, school_id: schoolId, belt, image_url: imageUrl })
-    .select()
-  
-  if (error) {
-    console.error('Error adding instructor:', error)
-    return { success: false, error }
-  }
-  return { success: true, data: data[0] }
 }
