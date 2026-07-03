@@ -1,0 +1,538 @@
+<title>Receipt Tip Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<style>
+  :root {
+    --paper: #FBFAF7;
+    --card: #FFFFFF;
+    --ink: #1C1F1D;
+    --ink-soft: #55605A;
+    --ink-faint: #8A938D;
+    --line: #E8E7E0;
+    --line-strong: #D8D7CE;
+    --accent: #0E9F6E;
+    --accent-ink: #0A7A54;
+    --accent-wash: #E7F5EE;
+    --field: #F4F3EE;
+    --shadow: 0 1px 2px rgba(28,31,29,.05), 0 12px 32px -12px rgba(28,31,29,.18);
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14171A;
+      --card: #1D2125;
+      --ink: #ECEFEA;
+      --ink-soft: #A6AFA8;
+      --ink-faint: #6B746E;
+      --line: #2C3237;
+      --line-strong: #3A4147;
+      --accent: #2FD79B;
+      --accent-ink: #46E0A9;
+      --accent-wash: #16302A;
+      --field: #23292E;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -16px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FBFAF7; --card: #FFFFFF; --ink: #1C1F1D; --ink-soft: #55605A;
+    --ink-faint: #8A938D; --line: #E8E7E0; --line-strong: #D8D7CE;
+    --accent: #0E9F6E; --accent-ink: #0A7A54; --accent-wash: #E7F5EE; --field: #F4F3EE;
+    --shadow: 0 1px 2px rgba(28,31,29,.05), 0 12px 32px -12px rgba(28,31,29,.18);
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171A; --card: #1D2125; --ink: #ECEFEA; --ink-soft: #A6AFA8;
+    --ink-faint: #6B746E; --line: #2C3237; --line-strong: #3A4147;
+    --accent: #2FD79B; --accent-ink: #46E0A9; --accent-wash: #16302A; --field: #23292E;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -16px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px calc(40px + env(safe-area-inset-bottom));
+  }
+
+  header { text-align: center; margin: 8px 0 20px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0 0 4px;
+  }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+  .sub { color: var(--ink-soft); font-size: 14px; margin: 6px 0 0; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .label {
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 10px; display: block;
+  }
+
+  /* Capture */
+  .capture {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; width: 100%; min-height: 132px;
+    border: 1.5px dashed var(--line-strong); border-radius: 14px;
+    background: var(--field); color: var(--ink-soft);
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    padding: 20px; text-align: center;
+    transition: border-color .15s, background .15s;
+  }
+  .capture:active { border-color: var(--accent); }
+  .capture svg { width: 30px; height: 30px; stroke: var(--accent); }
+  .capture .hint { font-size: 12.5px; font-weight: 500; color: var(--ink-faint); }
+  .preview-wrap { position: relative; }
+  .preview {
+    width: 100%; border-radius: 14px; display: block;
+    max-height: 260px; object-fit: cover; border: 1px solid var(--line);
+  }
+  .retake {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,.62); color: #fff; border: 0;
+    font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 999px;
+    cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .ocr-status {
+    display: flex; align-items: center; gap: 9px;
+    margin-top: 12px; font-size: 13.5px; color: var(--ink-soft);
+    background: var(--accent-wash); border-radius: 10px; padding: 10px 12px;
+  }
+  .ocr-status.hide { display: none; }
+  .spinner {
+    width: 15px; height: 15px; border: 2px solid var(--accent); border-right-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite; flex: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip {
+    border: 1px solid var(--line-strong); background: var(--card); color: var(--ink);
+    border-radius: 999px; padding: 7px 13px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-variant-numeric: tabular-nums;
+  }
+  .chip:active { border-color: var(--accent); color: var(--accent-ink); }
+
+  /* Subtotal hero */
+  .amount-field { display: flex; align-items: center; gap: 4px; }
+  .currency { font-size: 30px; font-weight: 600; color: var(--ink-faint); }
+  .amount-input {
+    flex: 1; border: 0; background: transparent; outline: none;
+    font-family: inherit; font-size: 46px; font-weight: 800; letter-spacing: -.02em;
+    color: var(--ink); width: 100%; padding: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .amount-input::placeholder { color: var(--line-strong); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+  /* Tip pills */
+  .pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pill {
+    border: 1.5px solid var(--line-strong); background: var(--card); color: var(--ink);
+    border-radius: 12px; padding: 13px 4px; font-size: 16px; font-weight: 700;
+    cursor: pointer; text-align: center; font-variant-numeric: tabular-nums;
+    transition: all .12s;
+  }
+  .pill.active {
+    border-color: var(--accent); background: var(--accent); color: #fff;
+    box-shadow: 0 6px 16px -8px var(--accent);
+  }
+  :root[data-theme="dark"] .pill.active,
+  @media (prefers-color-scheme: dark) { }
+  .pill.custom.active { color: #06231a; }
+  .custom-tip { margin-top: 12px; display: none; }
+  .custom-tip.show { display: block; }
+  .slider-row { display: flex; align-items: center; gap: 14px; }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; flex: 1; height: 6px;
+    background: var(--line-strong); border-radius: 999px; outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 26px; height: 26px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+    border: 3px solid var(--card); box-shadow: 0 1px 6px rgba(0,0,0,.25);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent);
+    cursor: pointer; border: 3px solid var(--card);
+  }
+  .custom-val { font-size: 20px; font-weight: 800; color: var(--accent-ink); min-width: 58px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Stepper + toggle */
+  .stepper { display: flex; align-items: center; gap: 0; border: 1.5px solid var(--line-strong); border-radius: 12px; overflow: hidden; }
+  .stepper button {
+    width: 46px; height: 46px; border: 0; background: var(--card); color: var(--ink);
+    font-size: 24px; font-weight: 600; cursor: pointer; line-height: 1;
+  }
+  .stepper button:active { background: var(--field); }
+  .stepper .count { min-width: 44px; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stepper .count small { display: block; font-size: 10px; font-weight: 600; color: var(--ink-faint); letter-spacing: .05em; text-transform: uppercase; }
+
+  .switch { position: relative; width: 50px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .track {
+    position: absolute; inset: 0; background: var(--line-strong); border-radius: 999px;
+    cursor: pointer; transition: background .18s;
+  }
+  .track::before {
+    content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::before { transform: translateX(20px); }
+  .toggle-label { font-size: 15px; font-weight: 600; }
+  .toggle-label small { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-faint); }
+
+  /* Receipt total */
+  .receipt { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .receipt-body { padding: 18px 18px 6px; }
+  .receipt-line { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; font-size: 15.5px; color: var(--ink-soft); }
+  .receipt-line .v { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 16px; }
+  .receipt-line.tip .v { color: var(--accent-ink); }
+  .dashed { border-top: 1.5px dashed var(--line-strong); margin: 6px 0; }
+  .receipt-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 16px 18px; background: var(--accent-wash);
+    border-top: 1px solid var(--line);
+  }
+  .receipt-total .t { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-ink); }
+  .receipt-total .g { font-size: 32px; font-weight: 800; color: var(--ink); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .per-person { text-align: center; font-size: 14px; color: var(--ink-soft); padding: 0 18px 16px; }
+  .per-person b { color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+
+  .foot { text-align: center; color: var(--ink-faint); font-size: 12px; margin-top: 22px; line-height: 1.6; }
+
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Snap · Split · Tip</p>
+    <h1>Receipt Tip Calculator</h1>
+    <p class="sub">Photograph the receipt — I'll tip on the pre‑tax subtotal.</p>
+  </header>
+
+  <div class="card">
+    <span class="label">Receipt photo</span>
+    <label class="capture" id="captureBtn" for="photoInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span>Take a photo of the receipt</span>
+      <span class="hint">or choose from your library</span>
+    </label>
+    <input id="photoInput" type="file" accept="image/*" capture="environment" class="visually-hidden" />
+
+    <div class="preview-wrap" id="previewWrap" style="display:none">
+      <img class="preview" id="preview" alt="Your receipt" />
+      <button class="retake" id="retake" type="button">Retake</button>
+    </div>
+
+    <div class="ocr-status hide" id="ocrStatus">
+      <span class="spinner" id="ocrSpinner"></span>
+      <span id="ocrText">Reading receipt…</span>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="label" style="margin:0">Subtotal (before tax)</span>
+    </div>
+    <div class="amount-field" style="margin-top:6px">
+      <span class="currency">$</span>
+      <input class="amount-input" id="subtotal" inputmode="decimal" placeholder="0.00" aria-label="Subtotal before tax" />
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="label">Tip</span>
+    <div class="pills" id="pills">
+      <button class="pill" data-tip="15" type="button">15%</button>
+      <button class="pill active" data-tip="18" type="button">18%</button>
+      <button class="pill" data-tip="20" type="button">20%</button>
+      <button class="pill custom" data-tip="custom" type="button">Custom</button>
+    </div>
+    <div class="custom-tip" id="customTip">
+      <div class="slider-row">
+        <input type="range" id="tipSlider" min="0" max="35" step="1" value="18" />
+        <span class="custom-val" id="tipSliderVal">18%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:16px">
+      <div class="toggle-label">Split the bill<small>Divide the total evenly</small></div>
+      <div class="stepper">
+        <button id="minus" type="button" aria-label="Fewer people">−</button>
+        <div class="count"><span id="peopleCount">1</span><small id="peopleLabel">person</small></div>
+        <button id="plus" type="button" aria-label="More people">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="toggle-label">Round up total<small>To the nearest dollar</small></div>
+      <label class="switch">
+        <input type="checkbox" id="roundUp" />
+        <span class="track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="receipt" role="status" aria-live="polite">
+    <div class="receipt-body">
+      <div class="receipt-line"><span>Subtotal</span><span class="v" id="rSubtotal">$0.00</span></div>
+      <div class="receipt-line tip"><span id="rTipLabel">Tip (18%)</span><span class="v" id="rTip">$0.00</span></div>
+      <div class="dashed"></div>
+    </div>
+    <div class="receipt-total"><span class="t">Total</span><span class="g" id="rTotal">$0.00</span></div>
+    <div class="per-person" id="perPerson" style="display:none"></div>
+  </div>
+
+  <p class="foot">Tip is calculated on the subtotal, not on tax — the fair way to tip.<br/>Works offline once loaded. Nothing you photograph ever leaves your phone.</p>
+</div>
+
+<script>
+(function () {
+  var money = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+  var state = { subtotal: 0, tipPct: 18, custom: false, people: 1, roundUp: false };
+
+  var els = {
+    subtotal: document.getElementById("subtotal"),
+    pills: document.getElementById("pills"),
+    customTip: document.getElementById("customTip"),
+    tipSlider: document.getElementById("tipSlider"),
+    tipSliderVal: document.getElementById("tipSliderVal"),
+    peopleCount: document.getElementById("peopleCount"),
+    peopleLabel: document.getElementById("peopleLabel"),
+    roundUp: document.getElementById("roundUp"),
+    rSubtotal: document.getElementById("rSubtotal"),
+    rTip: document.getElementById("rTip"),
+    rTipLabel: document.getElementById("rTipLabel"),
+    rTotal: document.getElementById("rTotal"),
+    perPerson: document.getElementById("perPerson"),
+    photoInput: document.getElementById("photoInput"),
+    preview: document.getElementById("preview"),
+    previewWrap: document.getElementById("previewWrap"),
+    captureBtn: document.getElementById("captureBtn"),
+    retake: document.getElementById("retake"),
+    ocrStatus: document.getElementById("ocrStatus"),
+    ocrSpinner: document.getElementById("ocrSpinner"),
+    ocrText: document.getElementById("ocrText"),
+    chips: document.getElementById("chips")
+  };
+
+  function render() {
+    var sub = state.subtotal || 0;
+    var tip = sub * (state.tipPct / 100);
+    var total = sub + tip;
+    if (state.roundUp) {
+      total = Math.ceil(total);
+      tip = total - sub;
+    }
+    els.rSubtotal.textContent = money.format(sub);
+    els.rTip.textContent = money.format(tip);
+    els.rTipLabel.textContent = "Tip (" + state.tipPct + "%)";
+    els.rTotal.textContent = money.format(total);
+    if (state.people > 1) {
+      els.perPerson.style.display = "block";
+      els.perPerson.innerHTML = "Each person pays <b>" + money.format(total / state.people) + "</b>";
+    } else {
+      els.perPerson.style.display = "none";
+    }
+  }
+
+  // Subtotal input
+  els.subtotal.addEventListener("input", function () {
+    var v = parseFloat(els.subtotal.value.replace(/[^0-9.]/g, ""));
+    state.subtotal = isNaN(v) ? 0 : v;
+    render();
+  });
+  function setSubtotal(v) {
+    state.subtotal = v;
+    els.subtotal.value = v.toFixed(2);
+    render();
+  }
+
+  // Tip pills
+  els.pills.addEventListener("click", function (e) {
+    var btn = e.target.closest(".pill");
+    if (!btn) return;
+    Array.prototype.forEach.call(els.pills.children, function (p) { p.classList.remove("active"); });
+    btn.classList.add("active");
+    if (btn.dataset.tip === "custom") {
+      state.custom = true;
+      els.customTip.classList.add("show");
+      state.tipPct = parseInt(els.tipSlider.value, 10);
+    } else {
+      state.custom = false;
+      els.customTip.classList.remove("show");
+      state.tipPct = parseInt(btn.dataset.tip, 10);
+    }
+    render();
+  });
+  els.tipSlider.addEventListener("input", function () {
+    state.tipPct = parseInt(els.tipSlider.value, 10);
+    els.tipSliderVal.textContent = state.tipPct + "%";
+    render();
+  });
+
+  // Stepper
+  document.getElementById("plus").addEventListener("click", function () {
+    state.people = Math.min(50, state.people + 1); updatePeople();
+  });
+  document.getElementById("minus").addEventListener("click", function () {
+    state.people = Math.max(1, state.people - 1); updatePeople();
+  });
+  function updatePeople() {
+    els.peopleCount.textContent = state.people;
+    els.peopleLabel.textContent = state.people === 1 ? "person" : "people";
+    render();
+  }
+
+  els.roundUp.addEventListener("change", function () {
+    state.roundUp = els.roundUp.checked; render();
+  });
+
+  // Photo + OCR
+  els.retake.addEventListener("click", function () {
+    els.photoInput.value = "";
+    els.previewWrap.style.display = "none";
+    els.captureBtn.style.display = "flex";
+    els.ocrStatus.classList.add("hide");
+    els.chips.innerHTML = "";
+  });
+
+  els.photoInput.addEventListener("change", function () {
+    var file = els.photoInput.files && els.photoInput.files[0];
+    if (!file) return;
+    var url = URL.createObjectURL(file);
+    els.preview.src = url;
+    els.previewWrap.style.display = "block";
+    els.captureBtn.style.display = "none";
+    els.chips.innerHTML = "";
+    runOCR(file);
+  });
+
+  function showStatus(msg, spinning) {
+    els.ocrStatus.classList.remove("hide");
+    els.ocrText.textContent = msg;
+    els.ocrSpinner.style.display = spinning ? "block" : "none";
+  }
+
+  function runOCR(file) {
+    showStatus("Reading receipt…", true);
+    loadTesseract().then(function (T) {
+      return T.recognize(file, "eng", {
+        logger: function (m) {
+          if (m.status === "recognizing text") {
+            showStatus("Reading receipt… " + Math.round(m.progress * 100) + "%", true);
+          }
+        }
+      });
+    }).then(function (res) {
+      var parsed = parseReceipt(res.data.text || "");
+      if (parsed.subtotal != null) {
+        setSubtotal(parsed.subtotal);
+        showStatus("Found subtotal " + money.format(parsed.subtotal) + " — tap a chip to change.", false);
+      } else if (parsed.amounts.length) {
+        showStatus("Couldn't spot a subtotal. Tap the right amount:", false);
+      } else {
+        showStatus("Couldn't read the numbers — type the subtotal below.", false);
+      }
+      renderChips(parsed.amounts, parsed.subtotal);
+    }).catch(function () {
+      showStatus("Auto‑read unavailable here — just type the subtotal below.", false);
+    });
+  }
+
+  function renderChips(amounts, chosen) {
+    els.chips.innerHTML = "";
+    amounts.slice(0, 8).forEach(function (a) {
+      var b = document.createElement("button");
+      b.className = "chip";
+      b.type = "button";
+      b.textContent = money.format(a);
+      if (chosen != null && Math.abs(a - chosen) < 0.005) b.style.borderColor = "var(--accent)";
+      b.addEventListener("click", function () {
+        setSubtotal(a);
+        showStatus("Using " + money.format(a) + " as the subtotal.", false);
+      });
+      els.chips.appendChild(b);
+    });
+  }
+
+  // Parse OCR text for a subtotal + all currency amounts
+  function parseReceipt(text) {
+    var lines = text.split(/\r?\n/);
+    var amountRe = /(\d{1,4}(?:[.,]\d{3})*[.,]\d{2})/g;
+    var toNum = function (s) {
+      s = s.replace(/\s/g, "");
+      // treat last separator as decimal
+      var m = s.match(/^(.*)[.,](\d{2})$/);
+      if (!m) return NaN;
+      var whole = m[1].replace(/[.,]/g, "");
+      return parseFloat(whole + "." + m[2]);
+    };
+    var all = [];
+    lines.forEach(function (line) {
+      var mm = line.match(amountRe);
+      if (mm) mm.forEach(function (x) { var n = toNum(x); if (!isNaN(n)) all.push(n); });
+    });
+
+    var subtotal = null;
+    for (var i = 0; i < lines.length; i++) {
+      var lower = lines[i].toLowerCase();
+      if (/sub[\s\-]*total/.test(lower)) {
+        var m = lines[i].match(amountRe);
+        var n = m ? toNum(m[m.length - 1]) : NaN;
+        // amount might be on the next line
+        if ((isNaN(n) || n === 0) && lines[i + 1]) {
+          var m2 = lines[i + 1].match(amountRe);
+          if (m2) n = toNum(m2[m2.length - 1]);
+        }
+        if (!isNaN(n) && n > 0) { subtotal = n; break; }
+      }
+    }
+
+    // de-dupe amounts, keep plausible (> 0), sort descending
+    var seen = {};
+    var amounts = all.filter(function (a) {
+      if (a <= 0 || a > 100000) return false;
+      var k = a.toFixed(2); if (seen[k]) return false; seen[k] = 1; return true;
+    }).sort(function (a, b) { return b - a; });
+
+    return { subtotal: subtotal, amounts: amounts };
+  }
+
+  // Lazy-load Tesseract.js from CDN; rejects if blocked (e.g. offline / strict CSP)
+  var tessPromise = null;
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (tessPromise) return tessPromise;
+    tessPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+      s.onload = function () { window.Tesseract ? resolve(window.Tesseract) : reject(); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+      setTimeout(function () { if (!window.Tesseract) reject(); }, 12000);
+    });
+    return tessPromise;
+  }
+
+  render();
+})();
+</script>
